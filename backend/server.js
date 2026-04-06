@@ -15,19 +15,19 @@ let currentToken = "";
 
 const fetchNewToken = async () => {
   try {
-    console.log("جاري طلب توكن جديد من المزود...");
+    console.log("Requesting new token from provider...");
     const response = await axios.get(
       `${process.env.TOKEN_URL}?t=${Date.now()}`,
     );
 
     if (response.data && response.data.token) {
       currentToken = response.data.token.trim();
-      console.log(" تم تحديث التوكن بنجاح.");
+      console.log("Token updated successfully.");
       return currentToken;
     }
-    throw new Error("لم يتم العثور على التوكن في استجابة المزود");
+    throw new Error("Token was not found in provider response");
   } catch (error) {
-    console.error("فشل في جلب التوكن:", error.message);
+    console.error("Failed to fetch token:", error.message);
     return null;
   }
 };
@@ -54,7 +54,7 @@ app.get("/employees", async (req, res) => {
     if (!currentToken) {
       const token = await fetchNewToken();
       if (!token)
-        return res.status(500).json({ error: "تعذر الحصول على توكن" });
+        return res.status(500).json({ error: "Unable to obtain token" });
     }
 
     try {
@@ -65,7 +65,7 @@ app.get("/employees", async (req, res) => {
       });
     } catch (oracleError) {
       if (oracleError.response && oracleError.response.status === 401) {
-        console.warn(" التوكن مرفوض (401)، محاولة التجديد...");
+        console.warn("Token rejected (401), retrying with a new token...");
         const newToken = await fetchNewToken();
         if (newToken) {
           const retryResponse = await callOracle(newToken);
@@ -78,14 +78,14 @@ app.get("/employees", async (req, res) => {
       throw oracleError;
     }
   } catch (error) {
-    console.error(" Oracle Error:", error.response?.data || error.message);
+    console.error("Oracle Error:", error.response?.data || error.message);
     res.status(error.response?.status || 500).json({
-      error: "فشل الاتصال بنظام أوراكل",
+      error: "Failed to connect to Oracle system",
       details: error.response?.data || error.message,
     });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`السيرفر يعمل على: http://localhost:${PORT}`);
+  console.log(`Server running at: http://localhost:${PORT}`);
 });
