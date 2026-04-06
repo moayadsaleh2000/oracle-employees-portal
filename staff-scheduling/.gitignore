@@ -1,0 +1,31 @@
+# ----------------------
+# Node.js backend
+# ----------------------
+backend/node_modules
+backend/.env
+backend/package-lock.json
+
+# ----------------------
+# React frontend
+# ----------------------
+staff-scheduling/node_modules
+staff-scheduling/.env
+staff-scheduling/build
+
+# ----------------------
+# General dependencies & misc
+# ----------------------
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# misc
+.DS_Store
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
