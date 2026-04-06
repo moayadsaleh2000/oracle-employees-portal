@@ -15,12 +15,12 @@ staff-scheduling/build
 # ----------------------
 # General dependencies & misc
 # ----------------------
-/node_modules
-/.pnp
+node_modules
+.pnp
 .pnp.js
 
 # testing
-/coverage
+coverage
 
 # misc
 .DS_Store
