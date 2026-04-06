@@ -9,7 +9,7 @@ backend/package-lock.json
 # React frontend
 # ----------------------
 staff-scheduling/node_modules
-staff-scheduling/.env
+staff-scheduling/.env.development
 staff-scheduling/build
 
 # ----------------------
