@@ -1,73 +1,100 @@
 const axios = require("axios");
+const db = require("./db");
 
-let currentToken = "";
+const getStoredToken = () => {
+  return new Promise((resolve, reject) => {
+    db.get(
+      "SELECT value FROM config WHERE key = 'oracle_token'",
+      (err, row) => {
+        if (err) reject(err);
+        resolve(row ? row.value : null);
+      },
+    );
+  });
+};
+const saveToken = (token) => {
+  db.run(
+    "INSERT OR REPLACE INTO config (key, value) VALUES ('oracle_token', ?)",
+    [token],
+  );
+};
 
 const fetchNewToken = async () => {
   try {
-    console.log("Requesting new token from provider...");
-    const response = await axios.get(`${process.env.TOKEN_URL}?t=${Date.now()}`);
-
+    const response = await axios.get(
+      `${process.env.TOKEN_URL}?t=${Date.now()}`,
+    );
     if (response.data && response.data.token) {
-      currentToken = response.data.token.trim();
-      console.log("Token updated successfully.");
-      return currentToken;
+      const token = response.data.token.trim();
+      saveToken(token);
+      return token;
     }
-
-    throw new Error("Token was not found in provider response");
+    throw new Error("Token not found");
   } catch (error) {
-    console.error("Failed to fetch token:", error.message);
+    console.error("Token fetch error:", error.message);
     return null;
   }
 };
 
-const callOracle = async (token, offset, limit) => {
+const callOracle = async (token, offset, limit, searchQuery = "") => {
   const cleanBaseUrl = process.env.BASE_URL.replace(/\/$/, "");
-  return axios.get(`${cleanBaseUrl}/hcmRestApi/resources/11.13.18.05/emps`, {
-    params: { limit, offset },
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      "REST-Framework-Version": "4",
-      Accept: "application/json",
-    },
-    timeout: 10000,
-  });
-};
 
-const getEmployees = async (offset = 0, limit = 5) => {
-  if (!currentToken) {
-    const token = await fetchNewToken();
-    if (!token) {
-      const error = new Error("Unable to obtain token");
-      error.status = 500;
-      throw error;
-    }
+  const params = {
+    limit,
+    offset,
+    totalResults: false,
+  };
+
+  if (searchQuery && searchQuery.trim() !== "") {
+    params.q = isNaN(searchQuery)
+      ? `DisplayName LIKE '%${searchQuery}%'`
+      : `PersonNumber='${searchQuery}'`;
   }
 
   try {
-    const response = await callOracle(currentToken, offset, limit);
+    return await axios.get(
+      `${cleanBaseUrl}/hcmRestApi/resources/11.13.18.05/emps`,
+      {
+        params,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "REST-Framework-Version": "4",
+          Accept: "application/json",
+        },
+        timeout: 20000,
+      },
+    );
+  } catch (error) {
+    console.error(
+      "!!! Oracle Error Detail:",
+      JSON.stringify(error.response?.data, null, 2),
+    );
+    throw error;
+  }
+};
+
+const getEmployees = async (offset = 0, limit = 5, searchQuery = "") => {
+  let token = await getStoredToken();
+  if (!token) {
+    token = await fetchNewToken();
+  }
+
+  try {
+    const response = await callOracle(token, offset, limit, searchQuery);
     return {
       items: response.data.items || [],
       hasMore: response.data.hasMore,
     };
-  } catch (oracleError) {
-    if (oracleError.response && oracleError.response.status === 401) {
-      console.warn("Token rejected (401), retrying with a new token...");
+  } catch (error) {
+    if (error.response?.status === 401) {
       const newToken = await fetchNewToken();
       if (newToken) {
-        const retryResponse = await callOracle(newToken, offset, limit);
-        return {
-          items: retryResponse.data.items || [],
-          hasMore: retryResponse.data.hasMore,
-        };
+        const retry = await callOracle(newToken, offset, limit, searchQuery);
+        return { items: retry.data.items || [], hasMore: retry.data.hasMore };
       }
     }
-    throw oracleError;
+    throw error;
   }
 };
 
-module.exports = {
-  fetchNewToken,
-  callOracle,
-  getEmployees,
-};
+module.exports = { getEmployees, fetchNewToken };

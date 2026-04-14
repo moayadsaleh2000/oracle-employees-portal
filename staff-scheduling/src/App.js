@@ -1,100 +1,68 @@
-import React, { useEffect, useState } from "react";
-import "./App.css";
+import React, { useState, useEffect } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import alasql from "alasql";
+import Employees from "./pages/Employees";
+import Login from "./pages/Login";
 
 function App() {
-  const [employees, setEmployees] = useState([]);
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const limit = 5;
-
-  const loadData = async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const url = `${process.env.REACT_APP_API_URL}/employees?offset=${offset}`;
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-      setEmployees(data.items || []);
-      setHasMore(data.hasMore);
-    } catch (fetchError) {
-      console.error("خطأ في الاتصال بالسيرفر:", fetchError);
-      setError("حدث خطأ أثناء تحميل البيانات. حاول مرة أخرى.");
-      setEmployees([]);
-      setHasMore(false);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [isLoggedIn, setIsLoggedIn] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadData();
-  }, [offset]);
+    alasql("CREATE TABLE IF NOT EXISTS auth (id INT, status STRING)");
+    alasql(
+      "CREATE TABLE IF NOT EXISTS employees (DisplayName STRING, EmailAddress STRING, EmployeeNumber STRING)",
+    );
+
+    const checkAuth = () => {
+      try {
+        const res = alasql("SELECT * FROM auth WHERE id = 1");
+        if (res.length > 0 && res[0].status === "logged_in") {
+          setIsLoggedIn(true);
+        } else {
+          setIsLoggedIn(false);
+        }
+      } catch (e) {
+        setIsLoggedIn(false);
+      }
+      setIsLoading(false);
+    };
+
+    checkAuth();
+  }, []);
+
+  if (isLoading)
+    return (
+      <div style={{ textAlign: "center", marginTop: "50px" }}>
+        جاري تشغيل نظام NovaTech...
+      </div>
+    );
 
   return (
-    <div className="container">
-      <h1>بوابة موظفي أوراكل</h1>
-
-      <div className="status-bar">
-        {loading ? (
-          <span className="status-message loading">جارٍ التحميل...</span>
-        ) : error ? (
-          <span className="status-message error">{error}</span>
-        ) : (
-          <span className="status-message">
-            عرض {employees.length} من سجلات الموظفين
-          </span>
-        )}
-      </div>
-
-      <div className="table-wrapper">
-        <table className="employee-table">
-          <thead>
-            <tr>
-              <th>الاسم</th>
-              <th>الرقم الوظيفي</th>
-              <th>الإيميل</th>
-            </tr>
-          </thead>
-          <tbody>
-            {employees.map((emp) => (
-              <tr key={emp.PersonNumber}>
-                <td>{emp.DisplayName}</td>
-                <td>{emp.PersonNumber}</td>
-                <td>{emp.WorkEmail || "لا يوجد"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {!loading && employees.length === 0 && !error && (
-        <p className="empty-state">لا توجد نتائج للعرض حالياً.</p>
-      )}
-
-      <div className="pagination">
-        <button
-          onClick={() => setOffset(offset - limit)}
-          disabled={offset === 0 || loading}
-        >
-          السابق
-        </button>
-        <span className="page-info">صفحة {Math.floor(offset / limit) + 1}</span>
-        <button
-          onClick={() => setOffset(offset + limit)}
-          disabled={!hasMore || loading}
-        >
-          التالي
-        </button>
-      </div>
-    </div>
+    <Router>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            !isLoggedIn ? (
+              <Login setAuth={setIsLoggedIn} />
+            ) : (
+              <Navigate to="/employees" />
+            )
+          }
+        />
+        <Route
+          path="/employees"
+          element={isLoggedIn ? <Employees /> : <Navigate to="/" />}
+        />
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </Router>
   );
 }
 
