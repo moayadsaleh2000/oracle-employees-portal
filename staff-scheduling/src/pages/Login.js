@@ -1,7 +1,6 @@
 import "./Login.css";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import alasql from "alasql";
 import Swal from "sweetalert2";
 
 function Login({ setAuth }) {
@@ -34,10 +33,12 @@ function Login({ setAuth }) {
           });
           setIsRegister(false);
         } else {
-          alasql("DELETE FROM auth");
-          alasql("INSERT INTO auth VALUES (1, 'logged_in')");
+          localStorage.setItem("nova_token", data.token);
+
           setAuth(true);
           navigate("/employees");
+
+          Swal.close();
         }
       } else {
         Swal.fire({ icon: "error", title: "خطأ", text: data.error });

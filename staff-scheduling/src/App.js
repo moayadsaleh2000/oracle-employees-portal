@@ -5,7 +5,6 @@ import {
   Route,
   Navigate,
 } from "react-router-dom";
-import alasql from "alasql";
 import Employees from "./pages/Employees";
 import Login from "./pages/Login";
 
@@ -14,20 +13,12 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    alasql("CREATE TABLE IF NOT EXISTS auth (id INT, status STRING)");
-    alasql(
-      "CREATE TABLE IF NOT EXISTS employees (DisplayName STRING, EmailAddress STRING, EmployeeNumber STRING)",
-    );
-
     const checkAuth = () => {
-      try {
-        const res = alasql("SELECT * FROM auth WHERE id = 1");
-        if (res.length > 0 && res[0].status === "logged_in") {
-          setIsLoggedIn(true);
-        } else {
-          setIsLoggedIn(false);
-        }
-      } catch (e) {
+      const token = localStorage.getItem("nova_token");
+
+      if (token) {
+        setIsLoggedIn(true);
+      } else {
         setIsLoggedIn(false);
       }
       setIsLoading(false);
@@ -58,7 +49,13 @@ function App() {
         />
         <Route
           path="/employees"
-          element={isLoggedIn ? <Employees /> : <Navigate to="/" />}
+          element={
+            isLoggedIn ? (
+              <Employees setAuth={setIsLoggedIn} />
+            ) : (
+              <Navigate to="/" />
+            )
+          }
         />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

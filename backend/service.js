@@ -12,6 +12,7 @@ const getStoredToken = () => {
     );
   });
 };
+
 const saveToken = (token) => {
   db.run(
     "INSERT OR REPLACE INTO config (key, value) VALUES ('oracle_token', ?)",
@@ -29,9 +30,9 @@ const fetchNewToken = async () => {
       saveToken(token);
       return token;
     }
-    throw new Error("Token not found");
+    throw new Error("Token not found from Oracle");
   } catch (error) {
-    console.error("Token fetch error:", error.message);
+    console.error("Oracle Token fetch error:", error.message);
     return null;
   }
 };
@@ -65,10 +66,7 @@ const callOracle = async (token, offset, limit, searchQuery = "") => {
       },
     );
   } catch (error) {
-    console.error(
-      "!!! Oracle Error Detail:",
-      JSON.stringify(error.response?.data, null, 2),
-    );
+    console.error("!!! Oracle Error Detail:", error.response?.data);
     throw error;
   }
 };
@@ -81,7 +79,9 @@ const getEmployees = async (offset = 0, limit = 5, searchQuery = "") => {
 
   try {
     const response = await callOracle(token, offset, limit, searchQuery);
+
     return {
+      success: true,
       items: response.data.items || [],
       hasMore: response.data.hasMore,
     };
@@ -90,10 +90,18 @@ const getEmployees = async (offset = 0, limit = 5, searchQuery = "") => {
       const newToken = await fetchNewToken();
       if (newToken) {
         const retry = await callOracle(newToken, offset, limit, searchQuery);
-        return { items: retry.data.items || [], hasMore: retry.data.hasMore };
+        return {
+          success: true,
+          items: retry.data.items || [],
+          hasMore: retry.data.hasMore,
+        };
       }
     }
-    throw error;
+
+    return {
+      success: false,
+      error: "فشل في جلب البيانات من نظام أوراكل، تأكد من الإعدادات.",
+    };
   }
 };
 

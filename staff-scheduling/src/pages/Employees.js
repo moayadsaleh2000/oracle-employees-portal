@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
-import alasql from "alasql";
 import "./Employees.css";
 
-export default function Employees() {
+export default function Employees({ setAuth }) {
   const [employees, setEmployees] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [offset, setOffset] = useState(0);
@@ -14,13 +13,27 @@ export default function Employees() {
   const loadData = useCallback(async (currentSearch, currentOffset) => {
     setLoading(true);
     try {
+      const token = localStorage.getItem("nova_token");
+
       const url = `http://localhost:5000/employees?offset=${currentOffset}&limit=${limit}&q=${encodeURIComponent(currentSearch)}`;
-      const response = await fetch(url);
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: token,
+          "Content-Type": "application/json",
+        },
+      });
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
+
       const data = await response.json();
       setEmployees(data.items || []);
       setHasMore(data.hasMore);
     } catch (error) {
-      console.error("Load Error:", error);
+      console.error("خطأ في التحميل:", error);
     } finally {
       setLoading(false);
     }
@@ -33,9 +46,19 @@ export default function Employees() {
     return () => clearTimeout(timer);
   }, [searchTerm, offset, loadData]);
 
-  const handleLogout = () => {
-    alasql("DELETE FROM auth");
-    window.location.href = "/";
+  const handleLogout = async () => {
+    const token = localStorage.getItem("nova_token");
+
+    try {
+      await fetch("http://localhost:5000/logout", {
+        method: "POST",
+        headers: { Authorization: token },
+      });
+    } catch (e) {
+      console.log("فشل مسح التوكن من السيرفر، سيتم الحذف محلياً فقط");
+    }
+    localStorage.removeItem("nova_token");
+    if (setAuth) setAuth(false);
   };
 
   return (
@@ -76,8 +99,6 @@ export default function Employees() {
                 <th>المعرف</th>
                 <th>البريد الإلكتروني</th>
                 <th>القسم</th>
-                <th>الموقع</th>
-                <th>تاريخ التعيين</th>
                 <th>المسمى الوظيفي</th>
               </tr>
             </thead>
@@ -89,7 +110,7 @@ export default function Employees() {
                       onClick={() => setSelectedEmployee(emp)}
                       className="clickable-row"
                     >
-                      <td className="emp-name-cell">
+                      <td>
                         <strong>{emp.DisplayName}</strong>
                       </td>
                       <td>
@@ -97,12 +118,6 @@ export default function Employees() {
                       </td>
                       <td>{emp.WorkEmail || "---"}</td>
                       <td>{emp.DepartmentName || "عام"}</td>
-                      <td>{emp.LocationCode || "---"}</td>
-                      <td>
-                        {emp.CreationDate
-                          ? new Date(emp.CreationDate).toLocaleDateString()
-                          : "---"}
-                      </td>
                       <td>
                         <span className="job-tag">
                           {emp.JobTitle || "موظف"}
@@ -112,8 +127,8 @@ export default function Employees() {
                   ))
                 : !loading && (
                     <tr>
-                      <td colSpan="7" className="no-data">
-                        لم يتم العثور على نتائج
+                      <td colSpan="5" className="no-data">
+                        لا توجد نتائج
                       </td>
                     </tr>
                   )}
@@ -141,68 +156,15 @@ export default function Employees() {
           </button>
         </footer>
       </main>
-
       {selectedEmployee && (
         <div
           className="profile-overlay"
           onClick={() => setSelectedEmployee(null)}
         >
           <div className="profile-card" onClick={(e) => e.stopPropagation()}>
-            <div className="profile-header">
-              <div className="avatar">
-                {selectedEmployee.DisplayName.charAt(0)}
-              </div>
-              <h2>{selectedEmployee.DisplayName}</h2>
-              <p className="main-job-title">{selectedEmployee.JobTitle}</p>
-            </div>
-
-            <div className="profile-info-grid">
-              <div className="info-box">
-                <label>الرقم الوظيفي</label>
-                <p>{selectedEmployee.PersonNumber}</p>
-              </div>
-              <div className="info-box">
-                <label>القسم</label>
-                <p>{selectedEmployee.DepartmentName || "غير محدد"}</p>
-              </div>
-              <div className="info-box">
-                <label>نوع الموظف</label>
-                <p>{selectedEmployee.WorkerType || "موظف رسمي"}</p>
-              </div>
-              <div className="info-box">
-                <label>الحالة</label>
-                <p>{selectedEmployee.AssignmentStatusType || "Active (نشط)"}</p>
-              </div>
-              <div className="info-box">
-                <label>الوحدة التنظيمية</label>
-                <p>{selectedEmployee.BusinessUnitName || "NovaTech Main"}</p>
-              </div>
-              <div className="info-box">
-                <label>آخر تحديث</label>
-                <p>
-                  {selectedEmployee.LastUpdateDate
-                    ? new Date(
-                        selectedEmployee.LastUpdateDate,
-                      ).toLocaleDateString()
-                    : "---"}
-                </p>
-              </div>
-            </div>
-
-            <div className="profile-footer">
-              <button
-                className="action-btn-print"
-                onClick={() => window.print()}
-              >
-                طباعة
-              </button>
-              <button
-                className="close-btn-secondary"
-                onClick={() => setSelectedEmployee(null)}
-              >
-                إغلاق
-              </button>
-            </div>
+            <h2>{selectedEmployee.DisplayName}</h2>
+            <p>{selectedEmployee.JobTitle}</p>
+            <button onClick={() => setSelectedEmployee(null)}>إغلاق</button>
           </div>
         </div>
       )}
